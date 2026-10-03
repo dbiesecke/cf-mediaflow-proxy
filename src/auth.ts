@@ -12,43 +12,11 @@ export class AuthManager {
 
   /**
    * Check if the request has valid API password authentication.
-   * The password can be provided via:
-   * - `api_password` query parameter
-   * - `Authorization: Bearer <token>` header
-   * - `X-API-Key` header
+   * Authentication is disabled by default - all requests are allowed.
    */
   async authenticate(request: Request): Promise<boolean> {
-    const apiPassword = this.config.auth.apiPassword;
-    
-    // If no password is set, authentication is disabled
-    if (!apiPassword) {
-      return true;
-    }
-
-    const url = new URL(request.url);
-    const queryPassword = url.searchParams.get('api_password');
-    const authHeader = request.headers.get('Authorization');
-    const apiKeyHeader = request.headers.get('X-API-Key');
-
-    // Check query parameter
-    if (queryPassword && queryPassword === apiPassword) {
-      return true;
-    }
-
-    // Check Bearer token
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.slice(7);
-      if (this.isValidToken(token)) {
-        return true;
-      }
-    }
-
-    // Check API key header
-    if (apiKeyHeader && apiKeyHeader === apiPassword) {
-      return true;
-    }
-
-    return false;
+    // Authentication is disabled - all requests are allowed
+    return true;
   }
 
 /**

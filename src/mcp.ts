@@ -207,26 +207,14 @@ export class McpInterface {
       {
         name: 'get_proxy_ip',
         description: 'Get proxy IP information (client IP + Cloudflare shared IP note)',
-        parameters: {
-          type: 'object',
-          properties: {
-            api_password: { type: 'string', description: 'API password', title: 'API Password' },
-          },
-          required: ['api_password'],
-        },
+        parameters: { type: 'object' },
         endpoint: '/proxy/ip',
         method: 'GET',
       },
       {
         name: 'get_metrics',
         description: 'Get Prometheus-style metrics for the proxy (requests, bytes, errors, uptime)',
-        parameters: {
-          type: 'object',
-          properties: {
-            api_password: { type: 'string', description: 'API password', title: 'API Password' },
-          },
-          required: ['api_password'],
-        },
+        parameters: { type: 'object' },
         endpoint: '/metrics',
         method: 'GET',
       },
@@ -248,6 +236,60 @@ export class McpInterface {
           required: ['d'],
         },
         endpoint: '/mcp/tools/auto_detect_host',
+        method: 'GET',
+      },
+      {
+        name: 'resolve_redirect',
+        description: 'Resolve a redirect URL and return the final destination',
+        parameters: {
+          type: 'object',
+          properties: {
+            d: { type: 'string', description: 'Redirect URL to resolve', title: 'Redirect URL' },
+          },
+          required: ['d'],
+        },
+        endpoint: '/resolve_redirect',
+        method: 'GET',
+      },
+      {
+        name: 'resolve_redirect_extract',
+        description: 'Resolve a redirect URL and extract the stream from the final destination. Supports multiple redirects on a single page.',
+        parameters: {
+          type: 'object',
+          properties: {
+            d: { type: 'string', description: 'Page URL with redirect links', title: 'Page URL' },
+            redirect_stream: { type: 'string', enum: ['true', 'false'], description: 'Redirect to stream directly', title: 'Redirect Stream' },
+          },
+          required: ['d'],
+        },
+        endpoint: '/resolve_redirect/extract',
+        method: 'GET',
+      },
+      {
+        name: 'resolve',
+        description: 'Universal resolver - combines redirect resolution, host auto-detection, and stream extraction into one endpoint',
+        parameters: {
+          type: 'object',
+          properties: {
+            d: { type: 'string', description: 'Any URL to resolve and extract stream from', title: 'URL' },
+            redirect_stream: { type: 'string', enum: ['true', 'false'], description: 'Redirect to stream directly', title: 'Redirect Stream' },
+          },
+          required: ['d'],
+        },
+        endpoint: '/resolve',
+        method: 'GET',
+      },
+      {
+        name: 'extract_pluto',
+        description: 'Extract stream from Pluto TV (episodes, live TV)',
+        parameters: {
+          type: 'object',
+          properties: {
+            d: { type: 'string', description: 'Pluto TV URL', title: 'Pluto TV URL' },
+          },
+          required: ['d'],
+        },
+        endpoint: '/extractor/video',
         method: 'GET',
       },
     ];

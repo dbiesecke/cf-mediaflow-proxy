@@ -7,13 +7,16 @@ A Cloudflare Worker implementation of [MediaFlow Proxy Light](https://github.com
 ✅ **Stream Proxy** - Generic HTTP/HTTPS stream proxy with range request (seeking) support  
 ✅ **HLS Proxy** - M3U8 manifest and segment proxying with automatic URL rewriting  
 ✅ **DASH/MPD Support** - DASH manifest processing with segment proxying  
-✅ **Video Extractors** - 24+ video hosting services (Vidoza, Streamtape, Filemoon, Mixdrop, etc.)  
+✅ **Video Extractors** - 26+ video hosting services (Vidoza, Streamtape, Mixdrop, etc.)  
+✅ **Pluto TV** - Extract live TV and VOD streams from Pluto TV  
+✅ **Multi-Stream Extraction** - Extract multiple streams from pages with multiple redirect links  
+✅ **Generic Extractor** - Auto-detects streams from any page (HLS, DASH, MP4, MP3, WebM, etc.)  
 ✅ **EPG Proxy** - XMLTV/EPG pass-through with configurable caching  
 ✅ **Xtream Codes API** - Compatible with TiviMate, IPTV Smarters, and other XC clients  
 ✅ **MCP Interface** - Public Model Context Protocol interface for AI agents (discovery, tools, resources)  
 ✅ **Auto-detect Host** - Automatically detects host from URL if not specified  
 ✅ **Redirect Stream** - Redirect directly to stream with `redirect_stream=true`  
-✅ **Authentication** - API password protection  
+✅ **No Authentication Required** - All endpoints are public  
 ✅ **CORS Support** - Full CORS headers for web playback
 
 ## Deployment
@@ -82,17 +85,19 @@ wrangler custom-domains add mediaflow.yourdomain.com
 ### Video Extractor
 
 ```
-GET /extractor/video?host=<host>&d=<url>&api_password=<key>
-GET /extractor/video.mp4?host=<host>&d=<url>&api_password=<key>
-GET /extractor/video?host=<host>&d=<url>&redirect_stream=true&api_password=<key>
+GET /extractor/video?host=<host>&d=<url>
+GET /extractor/video.mp4?host=<host>&d=<url>
+GET /extractor/video?host=<host>&d=<url>&redirect_stream=true
 ```
 
-**Supported Hosts (24):**
-- vidoza, streamtape, filemoon, mixdrop, doodstream
-- voe, okru, uqload, streamwish, vidmoly
+**Supported Hosts (27):**
+- vidoza, streamtape, mixdrop, voe, okru, uqload, streamwish, vidmoly
 - city, lulustream, turbovidplay, maxstream, f16px
 - vavoo, fastream, vidfast, filelions, sportsonline
 - gupload, vixcloud, livetv, supervideo
+- filemoon, filemoon-not-working (Cloudflare protected)
+- doodstream, doodstream-not-working (Cloudflare protected)
+- generic (auto-detects HLS/DASH/MP4/MP3/WebM from any page)
 
 **Auto-detect host:**
 ```bash
@@ -105,6 +110,55 @@ curl "https://your-worker.workers.dev/extractor/video?d=https://bysezejataos.com
 # redirect_stream=true returns a 302 redirect to the stream URL
 curl -L "https://your-worker.workers.dev/extractor/video?d=https://bysezejataos.com/d/nvnd82i0xymc&redirect_stream=true"
 ```
+
+**Multi-stream extraction (pages with multiple redirect links):**
+```bash
+# Extracts all streams from a page with multiple redirect links
+curl "https://your-worker.workers.dev/resolve_redirect/extract?d=https://aniworld.to/anime/stream/black-torch/staffel-1/episode-1"
+```
+
+**Pluto TV:**
+```bash
+# Episode
+curl "https://your-worker.workers.dev/extractor/video?host=pluto&d=https://pluto.tv/gsa/shows/2740225/episode/60dee91bfc802600134b8852/"
+
+# Live TV
+curl "https://your-worker.workers.dev/extractor/video?host=pluto&d=https://pluto.tv/gsa/watch/live-tv/#32227"
+```
+
+**Generic extractor (any page with stream):**
+```bash
+# Use host=generic to extract streams from any webpage
+curl "https://your-worker.workers.dev/extractor/video?host=generic&d=https://www.example.com/video"
+```
+
+### Resolve Redirect
+
+```
+GET /resolve_redirect?d=<redirect_url>
+GET /resolve_redirect/extract?d=<redirect_url>
+GET /resolve?d=<url>
+```
+
+**Examples:**
+```bash
+# Simple redirect resolution
+curl "https://your-worker.workers.dev/resolve_redirect?d=https://aniworld.to/redirect/4171793"
+
+# Resolve and extract stream from redirect
+curl "https://your-worker.workers.dev/resolve_redirect/extract?d=https://aniworld.to/redirect/4171793"
+
+# Universal resolver - auto-detects host and extracts
+curl "https://your-worker.workers.dev/resolve?d=https://pluto.tv/gsa/shows/2740225/episode/60dee91bfc802600134b8852/"
+```
+
+**Multi-stream extraction with `/resolve_redirect/extract`:**
+```bash
+# Extract all streams from a page with multiple redirect links
+curl "https://your-worker.workers.dev/resolve_redirect/extract?d=https://aniworld.to/anime/stream/black-torch/staffel-1/episode-1"
+```
+
+> **Note on Cloudflare-protected hosts:** `filemoon` and `doodstream` use Cloudflare challenge pages that cannot be bypassed in Cloudflare Workers without additional infrastructure. They are marked as `-not-working` and will fail. Use `host=generic` as fallback for these URLs.
 
 ### MCP (Model Context Protocol) Interface
 
@@ -168,23 +222,61 @@ Returns XMLTV data with `X-EPG-Cache: HIT/MISS` header.
 
 ```bash
 # Generic stream
-mpv "https://your-worker.workers.dev/proxy/stream?d=https://example.com/video.mp4&api_password=secret"
+mpv "https://your-worker.workers.dev/proxy/stream?d=https://example.com/video.mp4"
 
 # HLS with custom headers
-mpv "https://your-worker.workers.dev/proxy/hls/manifest.m3u8?d=https://example.com/live.m3u8&h_Referer=https://example.com&api_password=secret"
+mpv "https://your-worker.workers.dev/proxy/hls/manifest.m3u8?d=https://example.com/live.m3u8&h_Referer=https://example.com"
+```
+
+### Video Extractor with Auto-detect
+
+```bash
+# Auto-detect host from URL
+curl "https://your-worker.workers.dev/extractor/video?d=https://bysezejataos.com/d/nvnd82i0xymc"
+
+# Redirect directly to stream
+curl -L "https://your-worker.workers.dev/extractor/video?d=https://bysezejataos.com/d/nvnd82i0xymc&redirect_stream=true"
+
+# Specify host explicitly
+curl "https://your-worker.workers.dev/extractor/video?host=voe&d=https://jeremyparticipantanything.com/e/d9kle2kfuuu4"
+
+# Generic extractor for any page
+curl "https://your-worker.workers.dev/extractor/video?host=generic&d=https://www.2ix2.com/rtl-live/"
+```
+
+### MCP Interface (AI Agents)
+
+```bash
+# Discover all tools
+curl "https://your-worker.workers.dev/mcp"
+
+# List all tools
+curl "https://your-worker.workers.dev/mcp/tools/list"
+
+# Auto-detect host from URL
+curl "https://your-worker.workers.dev/mcp/tools/auto_detect_host?d=https://bysezejataos.com/d/nvnd82i0xymc"
+
+# Extract stream with redirect
+curl "https://your-worker.workers.dev/mcp/execute?tool=video_extractor&d=https://jeremyparticipantanything.com/e/d9kle2kfuuu4&redirect_stream=true"
+
+# List supported hosts
+curl "https://your-worker.workers.dev/mcp/tools/list_supported_hosts"
+
+# Check health
+curl "https://your-worker.workers.dev/mcp/tools/health_check"
 ```
 
 ### EPG Proxy (Channels DVR, Plex, Emby)
 
 ```
-https://your-worker.workers.dev/proxy/epg?d=https://provider.com/epg.xml&api_password=secret
+https://your-worker.workers.dev/proxy/epg?d=https://provider.com/epg.xml
 ```
 
 ### Video Extractor
 
 ```bash
 # Get stream URL from Vidoza
-curl "https://your-worker.workers.dev/extractor/video?host=vidoza&d=https://vidoza.net/abc123&api_password=secret"
+curl "https://your-worker.workers.dev/extractor/video?host=vidoza&d=https://vidoza.net/abc123"
 ```
 
 ### Xtream Codes (TiviMate)
@@ -192,15 +284,12 @@ curl "https://your-worker.workers.dev/extractor/video?host=vidoza&d=https://vido
 ```
 URL: https://your-worker.workers.dev
 Username: your_username
-Password: your_api_password
+Password: your_password
 ```
 
 ## Authentication
 
-The API password can be provided via:
-1. Query parameter: `?api_password=secret`
-2. Authorization header: `Authorization: Bearer secret`
-3. Custom header: `X-API-Key: secret`
+**No authentication required** - All endpoints are public by default.
 
 ## Web UI
 
@@ -211,6 +300,13 @@ Visit the worker URL in a browser for the built-in Web UI:
 - Playlist builder
 - Speed test
 - Metrics viewer
+
+## Security Considerations
+
+1. **All endpoints are public** - No API password required
+2. **Use HTTPS** - Cloudflare Workers always use HTTPS
+3. **Rate Limiting** - Cloudflare provides built-in DDoS protection
+4. **CORS enabled** - All endpoints allow cross-origin requests for web playback
 
 ## Limitations vs Rust Version
 

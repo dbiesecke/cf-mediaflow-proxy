@@ -41,6 +41,63 @@ export class Utilities {
   }
 
   /**
+   * /resolve_redirect - Resolve a redirect URL
+   * Returns the final URL after following redirects
+   */
+  async resolveRedirect(request: Request, url: URL): Promise<Response> {
+    const d = url.searchParams.get('d');
+    const destination = UrlUtils.decodeUrl(d);
+
+    if (!destination) {
+      return new Response(JSON.stringify({ error: 'Missing "d" parameter (URL to resolve)' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    const destUrl = new URL(destination);
+    if (!['http:', 'https:'].includes(destUrl.protocol)) {
+      return new Response(JSON.stringify({ error: 'Invalid URL scheme' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    try {
+      const response = await fetch(destination, {
+        method: 'GET',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+        redirect: 'follow',
+      });
+
+      const finalUrl = response.url;
+      const status = response.status;
+
+      return new Response(JSON.stringify({
+        original_url: destination,
+        final_url: finalUrl,
+        status: status,
+        redirected: finalUrl !== destination,
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        }
+      });
+    } catch (error: any) {
+      return new Response(JSON.stringify({
+        error: error.message,
+        original_url: destination
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  }
+
+  /**
    * /base64/encode - Base64 encode a URL
    */
   /**

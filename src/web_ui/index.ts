@@ -503,4 +503,50 @@ async function testSpeed() {
       headers: { 'Content-Type': 'text/html; charset=utf-8' }
     });
   }
+
+  /**
+   * /resolve_redirect - Resolve a redirect URL
+   */
+  async resolveRedirect(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+    const d = url.searchParams.get('d');
+    const destination = UrlUtils.decodeUrl(d);
+
+    if (!destination) {
+      return new Response(JSON.stringify({ error: 'Missing "d" parameter' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    try {
+      const response = await fetch(destination, {
+        method: 'GET',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+        redirect: 'follow',
+      });
+
+      return new Response(JSON.stringify({
+        original_url: destination,
+        final_url: response.url,
+        status: response.status,
+        redirected: response.url !== destination,
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        }
+      });
+    } catch (error: any) {
+      return new Response(JSON.stringify({
+        error: error.message,
+        original_url: destination
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  }
 }

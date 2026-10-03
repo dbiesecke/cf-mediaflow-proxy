@@ -58,7 +58,7 @@ describe('Extractors - Host Detection', () => {
 
   it('should list all supported hosts', () => {
     const hosts = extractors.getSupportedHosts();
-    expect(hosts).toHaveLength(24);
+    expect(hosts).toHaveLength(28);
     expect(hosts).toContain('voe');
     expect(hosts).toContain('vidmoly');
     expect(hosts).toContain('filemoon');
@@ -83,6 +83,10 @@ describe('Extractors - Host Detection', () => {
     expect(hosts).toContain('supervideo');
     expect(hosts).toContain('turbovidplay');
     expect(hosts).toContain('f16px');
+    expect(hosts).toContain('generic');
+    expect(hosts).toContain('pluto');
+    expect(hosts).toContain('filemoon-not-working');
+    expect(hosts).toContain('doodstream-not-working');
   });
 });
 
