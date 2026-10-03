@@ -220,6 +220,7 @@ case 'filemoon':
     const d = url.searchParams.get('d');
     const destination = UrlUtils.decodeUrl(d);
     const redirectStream = url.searchParams.get('redirect_stream') === 'true';
+    const outputFormat = url.searchParams.get('output_format') || 'json'; // 'json' or 'm3u8'
 
     if (!destination) {
       return new Response(JSON.stringify({ error: 'Missing "d" parameter (URL to resolve)' }), {
@@ -326,6 +327,18 @@ case 'filemoon':
         });
       }
 
+      // If output_format is m3u8, generate a playlist with all streams as variants
+      if (outputFormat === 'm3u8') {
+        const m3u8 = this.generateM3U8(results, url.hostname);
+        return new Response(m3u8, {
+          headers: {
+            'Content-Type': 'application/vnd.apple.mpegurl',
+            'Access-Control-Allow-Origin': '*',
+          },
+        });
+      }
+
+      // Default: return JSON
       return new Response(JSON.stringify({
         status: 'success',
         original_url: destination,
@@ -348,6 +361,38 @@ case 'filemoon':
         headers: { 'Content-Type': 'application/json' }
       });
     }
+  }
+
+  /**
+   * Generate M3U8 playlist with multiple stream variants
+   * Each stream is a fallback option - if one fails, the next is tried
+   */
+  private generateM3U8(results: Array<{ stream_url: string; format: string; proxy_url?: string }>, hostname: string): string {
+    const lines: string[] = [
+      '#EXTM3U',
+      '#EXT-X-VERSION:3',
+      '#EXT-X-PLAYLIST-TYPE:VOD',
+      `#EXT-X-TITLE:MediaFlow Proxy - ${results.length} streams`,
+      '',
+    ];
+
+    // Add each stream as a variant with fallback
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      const proxyUrl = result.proxy_url || `https://${hostname}/proxy/stream?d=${encodeURIComponent(result.streamUrl)}`;
+      const bandwidth = result.format === 'hls' ? 2000000 : (result.format === 'mp4' ? 4000000 : 1000000);
+      const resolution = result.format === 'hls' ? '1920x1080' : (result.format === 'mp4' ? '1920x1080' : '1280x720');
+
+      lines.push(`#EXT-X-STREAM-INF:BANDWIDTH=${bandwidth},RESOLUTION=${resolution},NAME="Stream ${i + 1} (${result.format.toUpperCase()})"`);
+      lines.push(proxyUrl);
+      lines.push('');
+    }
+
+    // Add fallback markers
+    lines.push('#EXT-X-FALLBACK:Stream 1');
+    lines.push(`#EXT-X-ENDLIST`);
+
+    return lines.join('\n');
   }
 
   /**
