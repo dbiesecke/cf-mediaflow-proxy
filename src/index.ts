@@ -8,6 +8,7 @@ import { Extractors } from './extractor';
 import { XtreamCodes } from './xtream';
 import { Utilities } from './utilities';
 import { WebUI } from './web_ui';
+import { McpInterface } from './mcp';
 import { AuthManager } from './auth';
 import { ConfigManager } from './config';
 
@@ -35,7 +36,8 @@ export default {
       { pattern: /^\/proxy\/ip$/, handler: (r: Request) => new Utilities(config, auth).getProxyIp(r, url) },
       { pattern: /^\/proxy\/acestream\/(.*)$/, handler: (r: Request) => new StreamProxy(config, auth).handleAcestream(r) },
       { pattern: /^\/proxy\/telegram\/(.*)$/, handler: (r: Request) => new StreamProxy(config, auth).handleTelegram(r) },
-      { pattern: /^\/extractor\/video(?:<ext>)?$/, handler: (r: Request) => new Extractors(config, auth).handle(r) },
+      { pattern: /^\/extractor\/video/, handler: (r: Request) => new Extractors(config, auth).handle(r) },
+      { pattern: /^\/mcp/, handler: (r: Request) => new McpInterface(config, auth).handleDiscovery(r, url) },
       { pattern: /^\/base64\/(encode|decode|check)$/, handler: (r: Request, m: string) => Utilities.handleBase64(r, config, auth, m) },
       { pattern: /^\/metrics$/, handler: (r: Request) => new Utilities(config, auth).handleMetrics(r) },
       { pattern: /^\/playlist\/builder$/, handler: (r: Request) => new WebUI(config, auth).playlistBuilder(r) },
