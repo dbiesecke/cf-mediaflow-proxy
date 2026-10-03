@@ -336,6 +336,31 @@ export class Extractors {
   }
 
   private async extractFilemoon(url: string, headers: Record<string, string>): Promise<ExtractionResult> {
+    // Try the API endpoint first (bysezejataos.com)
+    const apiUrl = url.replace('/d/', '/api/videos/').replace('/e/', '/api/videos/');
+    try {
+      const response = await fetch(apiUrl, { headers });
+      const data = await response.json() as any;
+      
+      // Check if playback data exists
+      if (data?.playback?.payload) {
+        // Try to find stream URL in the response
+        const streamUrl = data.playback.stream_url || data.playback.url;
+        if (streamUrl) {
+          return { streamUrl, format: streamUrl.includes('.m3u8') ? 'hls' : 'mp4', headers: this.extractVideoHeaders(headers, url) };
+        }
+      }
+      
+      // Check for direct URL in response
+      const directUrl = data?.playback?.url || data?.video?.stream_url || data?.url;
+      if (directUrl) {
+        return { streamUrl: directUrl, format: directUrl.includes('.m3u8') ? 'hls' : 'mp4' };
+      }
+    } catch {
+      // API call failed, try HTML extraction
+    }
+
+    // Try HTML extraction
     const response = await fetch(url, { headers });
     const html = await response.text();
 
@@ -393,6 +418,7 @@ export class Extractors {
 
     // VOE pattern: try multiple extraction methods
     const patterns = [
+      /var\s+source\s*=\s*['"]([^'"]+)['"]/i,
       /id="[^"]*player[^"]*"[^>]*\s+src=["']([^"']+)["']/i,
       /<source\s+src=["']([^"']+)["']/i,
       /(https?:\/\/[^"'\s]+\.mp4[^"'\s]*)/i,
@@ -577,6 +603,7 @@ export class Extractors {
       /<source\s+src=["']([^"']+)["']/i,
       /mp4:["']([^"']+)["']/i,
       /(https?:\/\/[^"'\s]+\.mp4[^"'\s]*)/i,
+      /(https?:\/\/[^"'\s]+\.m3u8[^"'\s]*)/i,
       /file["']?\s*:\s*["']([^"']+)["']/i,
       /sources["']?\s*:\s*["']([^"']+)["']/i,
     ];

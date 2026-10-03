@@ -10,8 +10,10 @@ A Cloudflare Worker implementation of [MediaFlow Proxy Light](https://github.com
 ✅ **Video Extractors** - 24+ video hosting services (Vidoza, Streamtape, Filemoon, Mixdrop, etc.)  
 ✅ **EPG Proxy** - XMLTV/EPG pass-through with configurable caching  
 ✅ **Xtream Codes API** - Compatible with TiviMate, IPTV Smarters, and other XC clients  
-✅ **Web UI** - Built-in URL generator, playlist builder, and speed test  
-✅ **Authentication** - API password protection
+✅ **MCP Interface** - Public Model Context Protocol interface for AI agents (discovery, tools, resources)  
+✅ **Auto-detect Host** - Automatically detects host from URL if not specified  
+✅ **Redirect Stream** - Redirect directly to stream with `redirect_stream=true`  
+✅ **Authentication** - API password protection  
 ✅ **CORS Support** - Full CORS headers for web playback
 
 ## Deployment
@@ -82,6 +84,7 @@ wrangler custom-domains add mediaflow.yourdomain.com
 ```
 GET /extractor/video?host=<host>&d=<url>&api_password=<key>
 GET /extractor/video.mp4?host=<host>&d=<url>&api_password=<key>
+GET /extractor/video?host=<host>&d=<url>&redirect_stream=true&api_password=<key>
 ```
 
 **Supported Hosts (24):**
@@ -90,6 +93,44 @@ GET /extractor/video.mp4?host=<host>&d=<url>&api_password=<key>
 - city, lulustream, turbovidplay, maxstream, f16px
 - vavoo, fastream, vidfast, filelions, sportsonline
 - gupload, vixcloud, livetv, supervideo
+
+**Auto-detect host:**
+```bash
+# Omit host parameter to auto-detect from URL
+curl "https://your-worker.workers.dev/extractor/video?d=https://bysezejataos.com/d/nvnd82i0xymc"
+```
+
+**Redirect to stream directly:**
+```bash
+# redirect_stream=true returns a 302 redirect to the stream URL
+curl -L "https://your-worker.workers.dev/extractor/video?d=https://bysezejataos.com/d/nvnd82i0xymc&redirect_stream=true"
+```
+
+### MCP (Model Context Protocol) Interface
+
+The Worker exposes a public MCP interface for AI agents to discover and use tools:
+
+```
+GET /mcp                    - MCP discovery (lists all tools)
+GET /mcp/tools/list         - List all available tools
+GET /mcp/tools/<tool_name>  - Get tool details
+GET /mcp/resources          - List available resources
+GET /mcp/prompts/list       - List available prompts
+```
+
+**Tools available:**
+- `stream_proxy` - Proxy any HTTP stream
+- `hls_proxy` - Proxy HLS manifests
+- `mpd_proxy` - Proxy DASH manifests
+- `video_extractor` - Extract stream URL from video hosts
+- `epg_proxy` - Fetch XMLTV EPG data
+- `xtream_player_api` - Xtream Codes Player API
+- `xtream_m3u` - M3U playlist export
+- `xtream_xmltv` - XMLTV EPG endpoint
+- `base64_encode` / `base64_decode` - Base64 encoding
+- `health_check` - Check worker health
+- `list_supported_hosts` - List all extractor hosts
+- `auto_detect_host` - Detect host from URL
 
 ### EPG Proxy
 
