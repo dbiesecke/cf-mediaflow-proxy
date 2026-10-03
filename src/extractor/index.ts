@@ -545,6 +545,7 @@ case 'filemoon':
       'gupload': ['gupload.io'],
       'livetv': ['livetv.sx'],
       'supervideo': ['supervideo.tv'],
+      'pluto': ['pluto.tv'],
     };
 
     for (const [host, patterns] of Object.entries(hostPatterns)) {
@@ -1164,7 +1165,11 @@ case 'filemoon':
     for (const pattern of patterns) {
       const match = html.match(pattern);
       if (match && match[1]) {
-        const streamUrl = match[1];
+        let streamUrl = match[1];
+        // Only accept absolute URLs
+        if (!streamUrl.startsWith('http://') && !streamUrl.startsWith('https://')) {
+          continue;
+        }
         let format = 'mp4';
         if (streamUrl.includes('.m3u8')) format = 'hls';
         else if (streamUrl.includes('.mp3')) format = 'mp3';
