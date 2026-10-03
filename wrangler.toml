@@ -42,3 +42,7 @@ new_classes = ["CacheDO", "EPGCacheDO"]
 # [[r2_buckets]]
 # binding = "STORAGE"
 # bucket_name = "mediaflow-storage"
+
+[env.staging]
+name = "mediaflow-light-staging"
+vars = { ENVIRONMENT = "staging" }
