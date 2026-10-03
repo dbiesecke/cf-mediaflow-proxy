@@ -379,7 +379,7 @@ case 'filemoon':
     // Add each stream as a variant with fallback
     for (let i = 0; i < results.length; i++) {
       const result = results[i];
-      const proxyUrl = result.proxy_url || `https://${hostname}/proxy/stream?d=${encodeURIComponent(result.streamUrl)}`;
+      const proxyUrl = result.proxy_url || `https://${hostname}/proxy/stream?d=${encodeURIComponent(result.stream_url)}`;
       const bandwidth = result.format === 'hls' ? 2000000 : (result.format === 'mp4' ? 4000000 : 1000000);
       const resolution = result.format === 'hls' ? '1920x1080' : (result.format === 'mp4' ? '1920x1080' : '1280x720');
 
