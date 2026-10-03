@@ -19,20 +19,6 @@ HLS_SEGMENT_CACHE_TTL = "300"
 EPG_CACHE_TTL = "3600"
 LOG_LEVEL = "info"
 
-# Durable Objects for caching
-[[durable_objects.bindings]]
-name = "CacheDO"
-class_name = "CacheDO"
-
-[[durable_objects.bindings]]
-name = "EPGCacheDO"
-class_name = "EPGCacheDO"
-
-# Durable Object migrations
-[[migrations]]
-tag = "v1"
-new_classes = ["CacheDO", "EPGCacheDO"]
-
 # Optional: KV namespace for caching (uncomment after creating KV namespace)
 # [kv_namespaces]
 # binding = "CACHE"

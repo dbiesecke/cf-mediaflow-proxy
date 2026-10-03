@@ -10,7 +10,6 @@ import { Utilities } from './utilities';
 import { WebUI } from './web_ui';
 import { AuthManager } from './auth';
 import { ConfigManager } from './config';
-import { CacheDO, EPGCacheDO } from './durable_objects';
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -92,9 +91,4 @@ export interface Env {
   // Cloudflare bindings
   CACHE?: any; // KV namespace
   STORAGE?: any; // R2 bucket
-  // Durable Objects
-  CacheDO?: DurableObjectNamespace;
-  EPGCacheDO?: DurableObjectNamespace;
 }
-
-export { CacheDO, EPGCacheDO };
