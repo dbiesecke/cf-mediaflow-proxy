@@ -1,0 +1,44 @@
+name = "mediaflow-proxy-light"
+main = "src/index.ts"
+compatibility_date = "2024-11-15"
+compatibility_flags = ["nodejs_compat"]
+
+# Workers Premium (required for streaming response with range requests)
+# https://developers.cloudflare.com/workers/platform/compatibility-table
+# Use 'workers' plan for basic functionality, 'premium' for streaming
+
+[vars]
+# API password protection (set via wrangler secret put)
+# APP__AUTH__API_PASSWORD = "your-secure-password"
+SERVER_PORT = "8888"
+PROXY_CONNECT_TIMEOUT = "30"
+PROXY_BUFFER_SIZE = "262144"
+PROXY_FOLLOW_REDIRECTS = "true"
+HLS_PREBUFFER_SEGMENTS = "5"
+HLS_SEGMENT_CACHE_TTL = "300"
+EPG_CACHE_TTL = "3600"
+LOG_LEVEL = "info"
+
+# Durable Objects for caching
+[[durable_objects.bindings]]
+name = "CacheDO"
+class_name = "CacheDO"
+
+[[durable_objects.bindings]]
+name = "EPGCacheDO"
+class_name = "EPGCacheDO"
+
+# Durable Object migrations
+[[migrations]]
+tag = "v1"
+new_classes = ["CacheDO", "EPGCacheDO"]
+
+# Optional: KV namespace for caching (uncomment after creating KV namespace)
+# [kv_namespaces]
+# binding = "CACHE"
+# id = "your-kv-namespace-id"
+
+# Optional: R2 bucket for large file caching (uncomment after creating R2 bucket)
+# [[r2_buckets]]
+# binding = "STORAGE"
+# bucket_name = "mediaflow-storage"

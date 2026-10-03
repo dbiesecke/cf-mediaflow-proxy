@@ -1,0 +1,32 @@
+{
+  "name": "mediaflow-proxy-light-worker",
+  "version": "1.0.0",
+  "description": "MediaFlow Proxy Light - Cloudflare Worker Edition",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "deploy:staging": "wrangler deploy --env staging",
+    "tail": "wrangler tail",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "cloudflare-workers",
+    "media-proxy",
+    "hls",
+    "dash",
+    "streaming",
+    "xtream-codes",
+    "epg"
+  ],
+  "author": "MediaFlow Proxy Light Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241112.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.0.0",
+    "wrangler": "^3.50.0"
+  },
+  "dependencies": {}
+}
