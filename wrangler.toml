@@ -20,3 +20,7 @@ LOG_LEVEL = "info"
 [env.staging]
 name = "mediaflow-light-staging"
 vars = { ENVIRONMENT = "staging" }
+# Static assets
+[assets]
+directory = "src/web_ui"
+binding = "ASSETS"
