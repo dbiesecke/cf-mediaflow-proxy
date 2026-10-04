@@ -58,9 +58,10 @@ export class HlsProxy {
       }
 
       if (isManifest) {
+        if (!response.ok) return new Response(response.body, { status: response.status });
         // Rewrite HLS manifest to use our proxy URLs
         const body = await response.clone().text();
-        const rewritten = this.rewriteHlsManifest(body, url.origin);
+        const rewritten = this.rewriteHlsManifest(body, response.url || destination, url);
         
         const headers = new Headers();
         headers.set('Content-Type', 'application/vnd.apple.mpegurl');
@@ -87,34 +88,30 @@ export class HlsProxy {
   /**
    * Rewrite HLS manifest to point segments through the proxy
    */
-  private rewriteHlsManifest(manifest: string, proxyOrigin: string): string {
-    const hlsConfig = this.config.hls;
+  private rewriteHlsManifest(manifest: string, source: string, requestUrl: URL): string {
     const lines = manifest.split('\n');
     const output: string[] = [];
-    let inExt = false;
-    let segmentCount = 0;
-    const maxPrebuffer = hlsConfig.prebufferSegments;
+    let nextIsManifest = false;
+    const proxied = (uri: string, isManifest: boolean): string => {
+      const destination = new URL(uri, source);
+      if (!['http:', 'https:'].includes(destination.protocol)) return uri;
+      const proxy = new URL(isManifest ? '/proxy/hls/manifest.m3u8' : '/proxy/hls/segment.ts', requestUrl.origin);
+      proxy.searchParams.set('d', destination.href);
+      requestUrl.searchParams.forEach((value, key) => {
+        if (key.startsWith('h_') || key === 'api_password') proxy.searchParams.set(key, value);
+      });
+      return proxy.href;
+    };
 
     for (const line of lines) {
-      // Don't rewrite absolute URLs (different origins)
-      const isAbsolutePath = line.startsWith('#') === false && 
-        (line.startsWith('http://') || line.startsWith('https://'));
-
-      if (isAbsolutePath && !inExt) {
-        // Rewrite relative and same-origin URLs to go through the proxy
-        const segmentUrl = new URL(line, manifest);
-        const proxyUrl = new URL('/proxy/hls/segment', proxyOrigin);
-        proxyUrl.searchParams.set('d', segmentUrl.toString());
-        
-        output.push(proxyUrl.toString());
-        segmentCount++;
-        
-        // Insert prebuffer comment
-        if (segmentCount === maxPrebuffer) {
-          output.push('#EXT-X-DISCONTINUITY');
-        }
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith('#')) {
+        output.push(proxied(trimmed, nextIsManifest || /\.m3u8(?:\?|$)/i.test(trimmed)));
+        nextIsManifest = false;
       } else {
-        output.push(line);
+        const playlistTag = /^#EXT-X-(MEDIA|I-FRAME-STREAM-INF|RENDITION-REPORT):/.test(trimmed);
+        output.push(line.replace(/URI="([^"]+)"/g, (_, uri: string) => `URI="${proxied(uri, playlistTag)}"`));
+        if (trimmed.startsWith('#EXT-X-STREAM-INF:')) nextIsManifest = true;
       }
     }
 
