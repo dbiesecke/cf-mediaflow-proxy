@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediaFlow Proxy Light - Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
+    <script type="module" src="/static/main.ts"></script>
+</head>
+<body x-data="app()" x-init="init()">
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="app-title">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    MediaFlow Proxy Light
+                </div>
+                <nav class="nav-tabs" role="tablist" aria-label="Main navigation">
+                    <button class="nav-tab" :class="{ active: activePage === 'dashboard' }" @click="setPage('dashboard')" role="tab" aria-selected="true">Dashboard</button>
+                    <button class="nav-tab" :class="{ active: activePage === 'proxy' }" @click="setPage('proxy')" role="tab">Stream Proxy</button>
+                    <button class="nav-tab" :class="{ active: activePage === 'extractor' }" @click="setPage('extractor')" role="tab">Video Extractor</button>
+                    <button class="nav-tab" :class="{ active: activePage === 'resolve' }" @click="setPage('resolve')" role="tab">Resolve</button>
+                    <button class="nav-tab" :class="{ active: activePage === 'epg' }" @click="setPage('epg')" role="tab">EPG Proxy</button>
+                    <button class="nav-tab" :class="{ active: activePage === 'xtream' }" @click="setPage('xtream')" role="tab">Xtream Codes</button>
+                    <button class="nav-tab" :class="{ active: activePage === 'tools' }" @click="setPage('tools')" role="tab">Utilities</button>
+                    <button class="nav-tab" :class="{ active: activePage === 'metrics' }" @click="setPage('metrics')" role="tab">Metrics</button>
+                </nav>
+                <div class="header-actions">
+                    <div class="form-group" style="margin:0; max-width:280px;">
+                        <label class="form-label" for="apiPassword" style="font-size:0.75rem;">API Password</label>
+                        <input type="password" id="apiPassword" class="form-input form-input-sm" x-model="apiPassword" @change="saveSettings" placeholder="Optional" aria-label="API Password">
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="app-main">
+            <!-- Dashboard Page -->
+            <section class="page" x-show="activePage === 'dashboard'" x-transition aria-labelledby="dashboard-title">
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
+                    <h1 id="dashboard-title" style="font-size:1.5rem;font-weight:700;">Dashboard</h1>
+                    <button class="btn btn-secondary btn-sm" @click="refreshDashboard" :disabled="loading">
+                        <span class="spinner" x-show="loading"></span> Refresh
+                    </button>
+                </div>
+
+                <!-- Stats Grid -->
+                <div class="grid grid-4" role="region" aria-label="Statistics">
+                    <article class="stat-card">
+                        <div class="stat-icon primary">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-value" x-text="formatNumber(stats.requests)"></div>
+                            <div class="stat-label">Total Requests</div>
+                        </div>
+                    </article>
+                    <article class="stat-card">
+                        <div class="stat-icon success">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-value" x-text="formatBytes(stats.bandwidth)"></div>
+                            <div class="stat-label">Bandwidth</div>
+                        </div>
+                    </article>
+                    <article class="stat-card">
+                        <div class="stat-icon danger">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-value" x-text="formatNumber(stats.errors)"></div>
+                            <div class="stat-label">Errors</div>
+                        </div>
+                    </article>
+                    <article class="stat-card">
+                        <div class="stat-icon warning">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-value" x-text="formatDuration(stats.uptime * 1000)"></div>
+                            <div class="stat-label">Uptime</div>
+                        </div>
+                    </article>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="grid grid-2">
+                    <div class="card">
+                        <header class="card-header">
+                            <h2 class="card-title">Quick Actions</h2>
+                        </header>
+                        <div class="card-body" style="display:grid;gap:0.75rem;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));">
+                            <button class="btn btn-primary" @click="setPage('proxy')" style="justify-content:flex-start;">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                Stream Proxy
+                            </button>
+                            <button class="btn btn-secondary" @click="setPage('extractor')" style="justify-content:flex-start;">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                                Extract Video
+                            </button>
+                            <button class="btn btn-secondary" @click="setPage('resolve')" style="justify-content:flex-start;">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 18a5 5 0 0 0-10 0"/><path d="M12 2v20"/><path d="M22 12a5 5 0 0 0-10 0"/></svg>
+                                Resolve URL
+                            </button>
+                            <button class="btn btn-secondary" @click="fetchProxyIp" style="justify-content:flex-start;">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                                Check Proxy IP
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <header class="card-header">
+                            <h2 class="card-title">Worker Info</h2>
+                        </header>
+                        <div class="card-body">
+                            <div style="display:grid;gap:0.75rem;">
+                                <div style="display:flex;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid var(--border);">
+                                    <span style="color:var(--text-muted);">Status</span>
+                                    <span class="badge badge-success">Healthy</span>
+                                </div>
+                                <div style="display:flex;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid var(--border);">
+                                    <span style="color:var(--text-muted);">Version</span>
+                                    <code>1.0.0-worker</code>
+                                </div>
+                                <div style="display:flex;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid var(--border);">
+                                    <span style="color:var(--text-muted);">Runtime</span>
+                                    <code>Cloudflare Workers</code>
+                                </div>
+                                <div style="display:flex;justify-content:space-between;padding:0.5rem 0;">
+                                    <span style="color:var(--text-muted);">Memory Limit</span>
+                                    <code>128 MB</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Endpoint Reference -->
+                <div class="card">
+                    <header class="card-header">
+                        <h2 class="card-title">API Endpoints Reference</h2>
+                    </header>
+                    <div class="card-body">
+                        <div class="table-container">
+                            <table class="table">
+                                <thead>
+                                    <tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td><code>GET</code></td><td><code>/health</code></td><td>Health check (no auth)</td></tr>
+                                    <tr><td><code>GET</code></td><td><code>/proxy/stream</code></td><td>Generic HTTP stream proxy</td></tr>
+                                    <tr><td><code>GET</code></td><td><code>/proxy/hls/manifest.m3u8</code></td><td>HLS manifest proxy (rewrites segments)</td></tr>
+                                    <tr><td><code>GET</code></td><td><code>/proxy/mpd/manifest.m3u8</code></td><td>DASH manifest proxy</td></tr>
+                                    <tr><td><code>GET</code></td><td><code>/extractor/video</code></td><td>Video host extractor (27+ hosts)</td></tr>
+                                    <tr><td><code>GET</code></td><td><code>/resolve_redirect</code></td><td>Resolve redirect URL</td></tr>
+                                    <tr><td><code>GET</code></td><td><code>/resolve_redirect/extract</code></td><td>Resolve + extract streams</td></tr>
+                                    <tr><td><code>GET</code></td><td><code>/proxy/epg</code></td><td>XMLTV/EPG proxy</td></tr>
+                                    <tr><td><code>GET</code></td><td><code>/player_api.php</code></td><td>Xtream Codes Player API</td></tr>
+                                    <tr><td><code>GET</code></td><td><code>/xmltv.php</code></td><td>Xtream Codes XMLTV</td></tr>
+                                    <tr><td><code>GET</code></td><td><code>/get.php</code></td><td>Xtream Codes M3U export</td></tr>
+                                    <tr><td><code>POST</code></td><td><code>/base64/encode</code></td><td>Base64 encode URL</td></tr>
+                                    <tr><td><code>POST</code></td><td><code>/base64/decode</code></td><td>Base64 decode</td></tr>
+                                    <tr><td><code>GET</code></td><td><code>/metrics</code></td><td>Prometheus metrics</td></tr>
+                                    <tr><td><code>GET</code></td><td><code>/mcp</code></td><td>MCP discovery</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Stream Proxy Page -->
+            <section class="page" x-show="activePage === 'proxy'" x-transition aria-labelledby="proxy-title">
+                <h1 id="proxy-title" style="font-size:1.5rem;font-weight:700;margin-bottom:1.5rem;">Stream Proxy</h1>
+                <div class="grid grid-2">
+                    <!-- Generic Stream Proxy -->
+                    <div class="card">
+                        <header class="card-header">
+                            <h2 class="card-title">Generic Stream Proxy</h2>
+                        </header>
+                        <div class="card-body">
+                            <p style="color:var(--text-muted);margin-bottom:1rem;">Proxy any HTTP/HTTPS stream with range request (seeking) support</p>
+                            <div class="form-group">
+                                <label class="form-label" for="streamUrl">Destination URL</label>
+                                <input type="url" id="streamUrl" class="form-input" x-model="proxyForm.url" placeholder="https://example.com/video.mp4">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="streamHeaders">Custom Headers (JSON)</label>
+                                <textarea id="streamHeaders" class="form-textarea" x-model="proxyForm.headers" placeholder='{"Referer": "https://example.com", "User-Agent": "Custom"}'></textarea>
+                                <p class="form-hint">Headers prefixed with h_ (e.g., h_Referer becomes Referer header)</p>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="streamFilename">Filename Hint (optional)</label>
+                                <input type="text" id="streamFilename" class="form-input" x-model="proxyForm.filename" placeholder="video.mp4">
+                                <p class="form-hint">Used for Content-Disposition header</p>
+                            </div>
+                            <div class="btn-group">
+                                <button class="btn btn-primary" @click="generateProxyUrl" :disabled="loading">Generate Proxy URL</button>
+                                <button class="btn btn-secondary" @click="copyProxyResult" :disabled="!proxyResult">Copy</button>
+                            </div>
+                            <div class="result-header" x-show="proxyResult">
+                                <span>Generated URL</span>
+                            </div>
+                            <div class="result-area" x-show="proxyResult" x-text="proxyResult"></div>
+                            <div class="result-area empty" x-show="!proxyResult">Enter a URL and click Generate to create a proxy link</div>
+                        </div>
+                    </div>
+
+                    <!-- HLS Proxy -->
+                    <div class="card">
+                        <header class="card-header">
+                            <h2 class="card-title">HLS Manifest Proxy</h2>
+                        </header>
+                        <div class="card-body">
+                            <p style="color:var(--text-muted);margin-bottom:1rem;">Proxy HLS streams with automatic manifest rewriting for segment URLs</p>
+                            <div class="form-group">
+                                <label class="form-label" for="hlsUrl">M3U8 Manifest URL</label>
+                                <input type="url" id="hlsUrl" class="form-input" x-model="hlsForm.url" placeholder="https://example.com/live.m3u8">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="hlsHeaders">Custom Headers (JSON)</label>
+                                <textarea id="hlsHeaders" class="form-textarea" x-model="hlsForm.headers" placeholder='{"Referer": "https://example.com"}'></textarea>
+                            </div>
+                            <div class="btn-group">
+                                <button class="btn btn-primary" @click="generateProxyUrl" :disabled="loading">Generate HLS Proxy URL</button>
+                                <button class="btn btn-secondary" @click="copyProxyResult" :disabled="!hlsResult">Copy</button>
+                            </div>
+                            <div class="result-header" x-show="hlsResult">
+                                <span>Generated URL</span>
+                            </div>
+                            <div class="result-area" x-show="hlsResult" x-text="hlsResult"></div>
+                            <div class="result-area empty" x-show="!hlsResult">Enter an M3U8 URL to generate a proxied manifest</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Video Extractor Page -->
+            <section class="page" x-show="activePage === 'extractor'" x-transition aria-labelledby="extractor-title">
+                <h1 id="extractor-title" style="font-size:1.5rem;font-weight:700;margin-bottom:1.5rem;">Video Extractor</h1>
+                <div class="grid grid-2">
+                    <div class="card">
+                        <header class="card-header">
+                            <h2 class="card-title">Extract Stream</h2>
+                        </header>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label class="form-label" for="extHost">Video Host</label>
+                                <select id="extHost" class="form-select" x-model="extractForm.host">
+                                    <option value="">Auto-detect (or select host)</option>
+                                    <option value="generic">Generic (auto-detect HLS/DASH/MP4)</option>
+                                    <template x-for="host in supportedHosts" :key="host">
+                                        <option :value="host" x-text="host"></option>
+                                    </template>
+                                </select>
+                                <p class="form-hint">Select a host or use auto-detect. 27+ supported hosts.</p>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="extUrl">Video Page URL</label>
+                                <div style="display:flex;gap:0.5rem;">
+                                    <input type="url" id="extUrl" class="form-input" x-model="extractForm.url" placeholder="https://vidoza.net/abc123" style="flex:1;">
+                                    <button class="btn btn-secondary" @click="autoDetect" style="align-self:flex-end;">Auto-Detect</button>
+                                </div>
+                            </div>
+                            <div class="form-group" style="display:flex;align-items:center;gap:0.75rem;">
+                                <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                                    <input type="checkbox" x-model="extractForm.redirect" style="width:18px;height:18px;">
+                                    <span>Redirect directly to stream (302)</span>
+                                </label>
+                            </div>
+                            <div class="btn-group">
+                                <button class="btn btn-primary" @click="extractVideo" :disabled="extractLoading || !extractForm.url">
+                                    <span class="spinner" x-show="extractLoading"></span>
+                                    <span x-show="extractLoading">Extracting...</span>
+                                    <span x-show="!extractLoading">Extract Stream</span>
+                                </button>
+                            </div>
+                            <div class="result-header" x-show="extractResult">
+                                <span x-text="extractResult.status === 'success' ? 'Success' : 'Error'"></span>
+                                <span class="badge" :class="extractResult.status === 'success' ? 'badge-success' : 'badge-danger'" x-text="extractResult.status"></span>
+                            </div>
+                            <div class="result-area" :class="{ success: extractResult?.status === 'success', error: extractResult?.status !== 'success' }" x-show="extractResult" x-text="formatJson(extractResult)"></div>
+                            <div class="result-area empty" x-show="!extractResult">Enter a video URL and click Extract</div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <header class="card-header">
+                            <h2 class="card-title">Supported Hosts</h2>
+                        </header>
+                        <div class="card-body">
+                            <div style="display:flex;flex-wrap:wrap;gap:0.375rem;">
+                                <span class="badge badge-info" x-for="host in supportedHosts" :key="host" x-text="host"></span>
+                            </div>
+                            <p class="form-hint" style="margin-top:1rem;">Cloudflare-protected hosts (filemoon, doodstream) may not work. Use <code>generic</code> as fallback.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Resolve Page -->
+            <section class="page" x-show="activePage === 'resolve'" x-transition aria-labelledby="resolve-title">
+                <h1 id="resolve-title" style="font-size:1.5rem;font-weight:700;margin-bottom:1.5rem;">Resolve & Extract</h1>
+                <div class="grid grid-2">
+                    <div class="card">
+                        <header class="card-header">
+                            <h2 class="card-title">Resolve Redirect</h2>
+                        </header>
+                        <div class="card-body">
+                            <p style="color:var(--text-muted);margin-bottom:1rem;">Follow redirects and get the final URL</p>
+                            <div class="form-group">
+                                <label class="form-label" for="resolveUrl">Redirect URL</label>
+                                <input type="url" id="resolveUrl" class="form-input" x-model="resolveForm.url" placeholder="https://example.com/redirect/123">
+                            </div>
+                            <div class="form-group" style="display:flex;align-items:center;gap:0.75rem;">
+                                <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                                    <input type="checkbox" x-model="resolveForm.extract" style="width:18px;height:18px;">
+                                    <span>Also extract streams from resolved page</span>
+                                </label>
+                            </div>
+                            <div class="btn-group">
+                                <button class="btn btn-primary" @click="resolveUrl" :disabled="resolveLoading || !resolveForm.url">
+                                    <span class="spinner" x-show="resolveLoading"></span>
+                                    <span x-show="resolveLoading">Resolving...</span>
+                                    <span x-show="!resolveLoading">Resolve</span>
+                                </button>
+                            </div>
+                            <div class="result-header" x-show="resolveResult">
+                                <span>Result</span>
+                            </div>
+                            <div class="result-area" x-show="resolveResult" x-text="formatJson(resolveResult)"></div>
+                            <div class="result-area empty" x-show="!resolveResult">Enter a redirect URL to resolve</div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <header class="card-header">
+                            <h2 class="card-title">Universal Resolver</h2>
+                        </header>
+                        <div class="card-body">
+                            <p style="color:var(--text-muted);margin-bottom:1rem;">Auto-detects host and extracts streams from any supported URL</p>
+                            <div class="form-group">
+                                <label class="form-label" for="universalUrl">Any Video URL</label>
+                                <input type="url" id="universalUrl" class="form-input" x-model="resolveForm.url" placeholder="https://pluto.tv/gsa/shows/... or any supported URL">
+                            </div>
+                            <div class="btn-group">
+                                <button class="btn btn-primary" @click="resolveUrl" :disabled="resolveLoading || !resolveForm.url">
+                                    <span class="spinner" x-show="resolveLoading"></span>
+                                    <span x-show="resolveLoading">Resolving...</span>
+                                    <span x-show="!resolveLoading">Resolve & Extract</span>
+                                </button>
+                            </div>
+                            <p class="form-hint" style="margin-top:0.5rem;">Works with: Pluto TV, aniworld.to, and all extractor hosts</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- EPG Proxy Page -->
+            <section class="page" x-show="activePage === 'epg'" x-transition aria-labelledby="epg-title">
+                <h1 id="epg-title" style="font-size:1.5rem;font-weight:700;margin-bottom:1.5rem;">EPG / XMLTV Proxy</h1>
+                <div class="card">
+                    <header class="card-header">
+                        <h2 class="card-title">Fetch EPG Data</h2>
+                    </header>
+                    <div class="card-body">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label" for="epgUrl">EPG URL (XMLTV)</label>
+                                <input type="url" id="epgUrl" class="form-input" x-model="epgForm.url" placeholder="https://provider.com/epg.xml">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="epgTtl">Cache TTL (seconds)</label>
+                                <input type="number" id="epgTtl" class="form-input" x-model="epgForm.ttl" value="3600" min="0">
+                                <p class="form-hint">0 = disable cache</p>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="epgHeaders">Custom Headers (JSON)</label>
+                            <textarea id="epgHeaders" class="form-textarea" x-model="epgForm.headers" placeholder='{}'></textarea>
+                        </div>
+                        <div class="btn-group">
+                            <button class="btn btn-primary" @click="fetchEpg" :disabled="epgLoading">
+                                <span class="spinner" x-show="epgLoading"></span>
+                                <span x-show="epgLoading">Fetching...</span>
+                                <span x-show="!epgLoading">Fetch EPG</span>
+                            </button>
+                        </div>
+                        <div class="result-header" x-show="epgResult">
+                            <span>EPG Data</span>
+                        </div>
+                        <div class="result-area" x-show="epgResult" x-text="epgResult" style="max-height:500px;"></div>
+                        <div class="result-area empty" x-show="!epgResult">Enter an EPG URL to fetch XMLTV data</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Xtream Codes Page -->
+            <section class="page" x-show="activePage === 'xtream'" x-transition aria-labelledby="xtream-title">
+                <h1 id="xtream-title" style="font-size:1.5rem;font-weight:700;margin-bottom:1.5rem;">Xtream Codes API</h1>
+                <div class="grid grid-2">
+                    <div class="card">
+                        <header class="card-header">
+                            <h2 class="card-title">Configuration</h2>
+                        </header>
+                        <div class="card-body">
+                            <p style="color:var(--text-muted);margin-bottom:1rem;">Compatible with TiviMate, IPTV Smarters, and other IPTV clients</p>
+                            <div class="url-display">
+                                <code>https://your-worker.workers.dev</code>
+                                <button class="btn btn-secondary btn-sm" @click="utils.copy('https://your-worker.workers.dev')">Copy</button>
+                            </div>
+                            <div style="margin-top:1rem;display:flex;flex-direction:column;gap:0.5rem;">
+                                <div class="url-display"><code>/player_api.php?username=USER&password=PASS&action=get_live_streams</code><button class="btn btn-secondary btn-sm" @click="utils.copy('/player_api.php?username=USER&password=PASS&action=get_live_streams')">Copy</button></div>
+                                <div class="url-display"><code>/xmltv.php?username=USER&password=PASS</code><button class="btn btn-secondary btn-sm" @click="utils.copy('/xmltv.php?username=USER&password=PASS')">Copy</button></div>
+                                <div class="url-display"><code>/get.php?username=USER&password=PASS</code><button class="btn btn-secondary btn-sm" @click="utils.copy('/get.php?username=USER&password=PASS')">Copy</button></div>
+                                <div class="url-display"><code>/USER/PASS/ID.ext</code><button class="btn btn-secondary btn-sm" @click="utils.copy('/USER/PASS/ID.ext')">Copy</button></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <header class="card-header">
+                            <h2 class="card-title">Available Actions</h2>
+                        </header>
+                        <div class="card-body">
+                            <div class="table-container">
+                                <table class="table">
+                                    <thead><tr><th>Action</th><th>Description</th></tr></thead>
+                                    <tbody>
+                                        <tr><td><code>get_live_streams</code></td><td>List all live channels</td></tr>
+                                        <tr><td><code>get_vod_streams</code></td><td>List all VOD content</td></tr>
+                                        <tr><td><code>get_series</code></td><td>List all series</td></tr>
+                                        <tr><td><code>get_live_categories</code></td><td>Live channel categories</td></tr>
+                                        <tr><td><code>get_vod_categories</code></td><td>VOD categories</td></tr>
+                                        <tr><td><code>get_series_categories</code></td><td>Series categories</td></tr>
+                                        <tr><td><code>get_short_epg</code></td><td>Short EPG data</td></tr>
+                                        <tr><td><code>get_simple_data_table</code></td><td>All data in one request</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Utilities Page -->
+            <section class="page" x-show="activePage === 'tools'" x-transition aria-labelledby="tools-title">
+                <h1 id="tools-title" style="font-size:1.5rem;font-weight:700;margin-bottom:1.5rem;">Utilities</h1>
+                <div class="grid grid-2">
+                    <!-- Base64 Tool -->
+                    <div class="card">
+                        <header class="card-header">
+                            <h2 class="card-title">Base64 Encode/Decode</h2>
+                        </header>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label class="form-label">Input</label>
+                                <textarea class="form-textarea" x-model="base64Form.input" placeholder="Enter URL or string to encode/decode"></textarea>
+                            </div>
+                            <div class="form-group" style="display:flex;gap:0.5rem;align-items:center;">
+                                <label class="form-label" style="margin:0;">Action</label>
+                                <select class="form-select" x-model="base64Form.action" style="width:auto;">
+                                    <option value="encode">Encode</option>
+                                    <option value="decode">Decode</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-primary" @click="base64Action">Process</button>
+                            <div class="result-header" x-show="base64Result">
+                                <span>Result</span>
+                            </div>
+                            <div class="result-area" x-show="base64Result" x-text="base64Result"></div>
+                        </div>
+                    </div>
+
+                    <!-- Playlist Builder -->
+                    <div class="card">
+                        <header class="card-header">
+                            <h2 class="card-title">M3U Playlist Builder</h2>
+                        </header>
+                        <div class="card-body">
+                            <p style="color:var(--text-muted);margin-bottom:1rem;">Create M3U playlists from channel lists</p>
+                            <button class="btn btn-primary" @click="loadPlaylistBuilder" :disabled="playlistLoading">
+                                <span class="spinner" x-show="playlistLoading"></span>
+                                <span x-show="playlistLoading">Loading...</span>
+                                <span x-show="!playlistLoading">Open Builder</span>
+                            </button>
+                            <div x-show="playlistHtml" style="margin-top:1rem;">
+                                <iframe :srcdoc="playlistHtml" style="width:100%;height:500px;border:1px solid var(--border);border-radius:var(--radius);"></iframe>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Speed Test -->
+                    <div class="card">
+                        <header class="card-header">
+                            <h2 class="card-title">Speed Test</h2>
+                        </header>
+                        <div class="card-body">
+                            <p style="color:var(--text-muted);margin-bottom:1rem;">Test download speed through the proxy</p>
+                            <button class="btn btn-primary" @click="loadSpeedtest" :disabled="speedtestLoading">
+                                <span class="spinner" x-show="speedtestLoading"></span>
+                                <span x-show="speedtestLoading">Loading...</span>
+                                <span x-show="!speedtestLoading">Run Speed Test</span>
+                            </button>
+                            <div x-show="speedtestHtml" style="margin-top:1rem;">
+                                <iframe :srcdoc="speedtestHtml" style="width:100%;height:300px;border:1px solid var(--border);border-radius:var(--radius);"></iframe>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Proxy IP -->
+                    <div class="card">
+                        <header class="card-header">
+                            <h2 class="card-title">Proxy IP Info</h2>
+                        </header>
+                        <div class="card-body">
+                            <p style="color:var(--text-muted);margin-bottom:1rem;">View proxy egress IP and client IP</p>
+                            <button class="btn btn-primary" @click="fetchProxyIp">Get Proxy IP</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Metrics Page -->
+            <section class="page" x-show="activePage === 'metrics'" x-transition aria-labelledby="metrics-title">
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
+                    <h1 id="metrics-title" style="font-size:1.5rem;font-weight:700;">Metrics</h1>
+                    <button class="btn btn-primary" @click="fetchMetrics" :disabled="metricsLoading">
+                        <span class="spinner" x-show="metricsLoading"></span>
+                        <span x-show="metricsLoading">Loading...</span>
+                        <span x-show="!metricsLoading">Refresh Metrics</span>
+                    </button>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <pre class="code-block" style="margin:0;"><code x-text="metricsData || 'Click Refresh Metrics to load Prometheus metrics'"></code></pre>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+</body>
+</html>
