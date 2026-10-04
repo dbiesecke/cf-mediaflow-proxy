@@ -65,7 +65,7 @@ export default {
     }
 
     // Web UI (static assets)
-    if (path === '/' || path.startsWith('/static/') || path.startsWith('/app/')) {
+    if (path === '/' || path === '/index.html' || path.startsWith('/static/') || path.startsWith('/app/')) {
       return WebUI.serveStatic(request, path);
     }
 

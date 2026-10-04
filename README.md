@@ -160,6 +160,28 @@ curl "https://your-worker.workers.dev/resolve_redirect/extract?d=https://aniworl
 
 > **Note on Cloudflare-protected hosts:** `filemoon` and `doodstream` use Cloudflare challenge pages that cannot be bypassed in Cloudflare Workers without additional infrastructure. They are marked as `-not-working` and will fail. Use `host=generic` as fallback for these URLs.
 
+### Stable playback links and M3U8 output
+
+`/resolve_redirect/extract` returns a `permalink_url` for each source; `proxy_url`
+also points to this stable Worker URL. Save these links rather than the diagnostic
+`stream_url`, whose upstream tokens can expire. Playback permalinks use the
+original redirect URL with `play=true` and resolve it again on every request.
+
+For direct HLS playback, append `output_format=m3u8` to an extraction request:
+
+```
+/resolve_redirect/extract?d=https%3A%2F%2Faniworld.to%2Fanime%2Fstream%2Fblack-torch%2Fstaffel-1%2Fepisode-1&output_format=m3u8
+```
+
+The master playlist contains HLS source permalinks. Individual playback requests
+return the freshly resolved HLS manifest with playlist, segment, key and init-map
+URLs routed through the Worker. MP4 sources can use playback permalinks but are
+excluded from HLS master playlists. Alternative sources do not guarantee automatic
+failover. Links stay usable while their original source remains available.
+
+In the Web UI, select **Resolve & extract multiple streams → Output format → m3u8**
+and use **Generate URL → Play**, **Open**, or copy the URL into a compatible player.
+
 ### MCP (Model Context Protocol) Interface
 
 The Worker exposes a public MCP interface for AI agents to discover and use tools:
@@ -294,12 +316,25 @@ Password: your_password
 ## Web UI
 
 Visit the worker URL in a browser for the built-in Web UI:
-- Stream proxy URL generator
-- Video extractor
-- EPG proxy tester
-- Playlist builder
-- Speed test
-- Metrics viewer
+
+- Stream, HLS, DASH and EPG forms with custom upstream headers and URL generation
+- Video extraction, host detection and redirect resolution
+- Native browser media player (format support depends on the browser)
+- M3U playlist builder with optional proxying, copy and download
+- Xtream API, playlist and XMLTV forms
+- Base64 encode/decode/check, health, IP information and metrics
+- MCP discovery, resources, prompts and tool requests
+- Proxy speed test with progress and cancellation
+
+The UI is self-contained and requires no external JavaScript libraries or static
+asset build. Responses are previewed up to 256 KiB; use generated links for full
+downloads or playback. `/playlist/builder` and `/speedtest` open the corresponding
+workspace tabs. API passwords entered in the UI stay in memory, while generated
+URLs include any credentials needed for external clients.
+
+Xtream data is currently sample or empty, with no configured stream IDs. AceStream
+and Telegram are unavailable in this Worker; the UI does not enable these backend
+capabilities. Live extraction also depends on availability of third-party hosts.
 
 ## Security Considerations
 

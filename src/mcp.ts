@@ -258,6 +258,8 @@ export class McpInterface {
           type: 'object',
           properties: {
             d: { type: 'string', description: 'Page URL with redirect links', title: 'Page URL' },
+            output_format: { type: 'string', enum: ['json', 'm3u8'], description: 'JSON with stable Worker permalinks, or a directly playable HLS playlist', title: 'Output format' },
+            play: { type: 'string', enum: ['true', 'false'], description: 'Resolve this individual source afresh and proxy its media for playback', title: 'Playback permalink' },
             redirect_stream: { type: 'string', enum: ['true', 'false'], description: 'Redirect to stream directly', title: 'Redirect Stream' },
           },
           required: ['d'],

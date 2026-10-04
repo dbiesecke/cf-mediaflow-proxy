@@ -5,6 +5,8 @@
 import { ConfigManager } from '../config';
 import { AuthManager } from '../auth';
 import { UrlUtils, Metrics } from '../utils';
+import { HlsProxy } from '../proxy/hls';
+import { StreamProxy } from '../proxy/stream';
 
 export class Extractors {
   private config: ConfigManager;
@@ -221,6 +223,9 @@ case 'filemoon':
     const destination = UrlUtils.decodeUrl(d);
     const redirectStream = url.searchParams.get('redirect_stream') === 'true';
     const outputFormat = url.searchParams.get('output_format') || 'json'; // 'json' or 'm3u8'
+    if (!['json', 'm3u8'].includes(outputFormat)) {
+      return new Response('output_format must be json or m3u8', { status: 400 });
+    }
 
     if (!destination) {
       return new Response(JSON.stringify({ error: 'Missing "d" parameter (URL to resolve)' }), {
@@ -238,28 +243,33 @@ case 'filemoon':
     }
 
     try {
+      // Permalinks resolve the source afresh on every playback request.
+      if (url.searchParams.get('play') === 'true') {
+        const denied = await this.auth.requireAuth(request);
+        if (denied) return denied;
+        const result = await this.resolveRedirectAndExtract(destination, UrlUtils.extractCustomHeaders(url));
+        if (!result.streamUrl) return new Response('No stream found', { status: 404 });
+        const proxy = new URL(result.format === 'hls' ? '/proxy/hls/manifest.m3u8' : '/proxy/stream', url.origin);
+        proxy.search = url.search;
+        ['play', 'output_format', 'redirect_stream', 'host'].forEach(key => proxy.searchParams.delete(key));
+        proxy.searchParams.set('d', result.streamUrl);
+        for (const [key, value] of Object.entries(result.headers || {})) {
+          proxy.searchParams.set('h_' + key.replace(/-/g, '_'), value);
+        }
+        const proxyRequest = new Request(proxy, request);
+        const response = result.format === 'hls'
+          ? await new HlsProxy(this.config, this.auth).handle(proxyRequest)
+          : await new StreamProxy(this.config, this.auth).handle(proxyRequest);
+        const headers = new Headers(response.headers);
+        headers.set('Cache-Control', 'no-store');
+        return new Response(response.body, { status: response.status, headers });
+      }
       // If the URL is a known redirect host, resolve and extract
       const host = this.detectHost(destination);
       if (host && (host === 'doodstream' || host === 'playmogo')) {
         const result = await this.resolveRedirectAndExtract(destination);
 
-        if (redirectStream && result.streamUrl) {
-          return Response.redirect(result.streamUrl, 302);
-        }
-
-        return new Response(JSON.stringify({
-          status: result.streamUrl ? 'success' : 'failed',
-          original_url: destination,
-          resolved_url: result.streamUrl ? new URL(result.streamUrl).origin : null,
-          stream_url: result.streamUrl,
-          format: result.format,
-          proxy_url: result.streamUrl ? `https://${url.hostname}/proxy/stream?d=${encodeURIComponent(result.streamUrl)}` : undefined,
-        }), {
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-          }
-        });
+        return this.resolvedResponse(result, destination, url, outputFormat, redirectStream);
       }
 
       // Otherwise, fetch the page and extract all redirect links
@@ -276,23 +286,7 @@ case 'filemoon':
         // No redirect links found, try to extract directly
         const result = await this.resolveRedirectAndExtract(destination);
 
-        if (redirectStream && result.streamUrl) {
-          return Response.redirect(result.streamUrl, 302);
-        }
-
-        return new Response(JSON.stringify({
-          status: result.streamUrl ? 'success' : 'failed',
-          original_url: destination,
-          resolved_url: result.streamUrl ? new URL(result.streamUrl).origin : null,
-          stream_url: result.streamUrl,
-          format: result.format,
-          proxy_url: result.streamUrl ? `https://${url.hostname}/proxy/stream?d=${encodeURIComponent(result.streamUrl)}` : undefined,
-        }), {
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-          }
-        });
+        return this.resolvedResponse(result, destination, url, outputFormat, redirectStream);
       }
 
       // Resolve all redirect links and extract streams
@@ -306,7 +300,8 @@ case 'filemoon':
               resolved_url: new URL(result.streamUrl).origin,
               stream_url: result.streamUrl,
               format: result.format,
-              proxy_url: `https://${url.hostname}/proxy/stream?d=${encodeURIComponent(result.streamUrl)}`,
+              proxy_url: this.permalink(redirectLink, url),
+              permalink_url: this.permalink(redirectLink, url),
             });
           }
         } catch (e) {
@@ -327,13 +322,18 @@ case 'filemoon':
         });
       }
 
-      // If output_format is m3u8, generate a playlist with all streams as variants
+      if (redirectStream) return Response.redirect(results[0].permalink_url, 302);
+
+      // Only HLS sources are valid HLS master-playlist variants.
       if (outputFormat === 'm3u8') {
-        const m3u8 = this.generateM3U8(results, url.hostname);
+        const hls = results.filter(result => result.format === 'hls');
+        if (!hls.length) return new Response('No HLS streams available for M3U8 output', { status: 422 });
+        const m3u8 = this.generateM3U8(hls);
         return new Response(m3u8, {
           headers: {
             'Content-Type': 'application/vnd.apple.mpegurl',
             'Access-Control-Allow-Origin': '*',
+            'Cache-Control': 'no-store',
           },
         });
       }
@@ -347,7 +347,8 @@ case 'filemoon':
       }), {
         headers: {
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'no-store'
         }
       });
 
@@ -365,34 +366,52 @@ case 'filemoon':
 
   /**
    * Generate M3U8 playlist with multiple stream variants
-   * Each stream is a fallback option - if one fails, the next is tried
+   * Variants use stable Worker permalinks, not expiring CDN URLs.
    */
-  private generateM3U8(results: Array<{ stream_url: string; format: string; proxy_url?: string }>, hostname: string): string {
+  private generateM3U8(results: Array<{ permalink_url: string }>): string {
     const lines: string[] = [
       '#EXTM3U',
       '#EXT-X-VERSION:3',
-      '#EXT-X-PLAYLIST-TYPE:VOD',
-      `#EXT-X-TITLE:MediaFlow Proxy - ${results.length} streams`,
       '',
     ];
 
-    // Add each stream as a variant with fallback
+    // Sources are alternatives, not guaranteed automatic failover.
     for (let i = 0; i < results.length; i++) {
       const result = results[i];
-      const proxyUrl = result.proxy_url || `https://${hostname}/proxy/stream?d=${encodeURIComponent(result.stream_url)}`;
-      const bandwidth = result.format === 'hls' ? 2000000 : (result.format === 'mp4' ? 4000000 : 1000000);
-      const resolution = result.format === 'hls' ? '1920x1080' : (result.format === 'mp4' ? '1920x1080' : '1280x720');
-
-      lines.push(`#EXT-X-STREAM-INF:BANDWIDTH=${bandwidth},RESOLUTION=${resolution},NAME="Stream ${i + 1} (${result.format.toUpperCase()})"`);
-      lines.push(proxyUrl);
+      lines.push(`#EXT-X-STREAM-INF:BANDWIDTH=2000000,NAME="Source ${i + 1}"`);
+      lines.push(result.permalink_url);
       lines.push('');
     }
 
-    // Add fallback markers
-    lines.push('#EXT-X-FALLBACK:Stream 1');
-    lines.push(`#EXT-X-ENDLIST`);
-
     return lines.join('\n');
+  }
+
+  private permalink(source: string, requestUrl: URL): string {
+    const url = new URL('/resolve_redirect/extract', requestUrl.origin);
+    url.search = requestUrl.search;
+    ['redirect_stream', 'host'].forEach(key => url.searchParams.delete(key));
+    url.searchParams.set('d', source);
+    url.searchParams.set('play', 'true');
+    url.searchParams.set('output_format', 'm3u8');
+    return url.href;
+  }
+
+  private resolvedResponse(result: ExtractionResult, source: string, url: URL, format: string, redirect: boolean): Response {
+    const permalink = result.streamUrl ? this.permalink(source, url) : undefined;
+    if (redirect && permalink) return Response.redirect(permalink, 302);
+    if (format === 'm3u8') {
+      if (!permalink) return new Response('No stream found', { status: 404 });
+      if (result.format !== 'hls') return new Response('M3U8 output requires an HLS source; use the playback permalink for this format.', { status: 422 });
+      return new Response(this.generateM3U8([{ permalink_url: permalink }]), {
+        headers: { 'Content-Type': 'application/vnd.apple.mpegurl', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' },
+      });
+    }
+    return new Response(JSON.stringify({
+      status: result.streamUrl ? 'success' : 'failed', original_url: source,
+      resolved_url: result.streamUrl ? new URL(result.streamUrl).origin : null,
+      stream_url: result.streamUrl, format: result.format,
+      proxy_url: permalink, permalink_url: permalink,
+    }), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' } });
   }
 
   /**
