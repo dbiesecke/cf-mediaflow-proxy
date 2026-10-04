@@ -24,3 +24,4 @@ vars = { ENVIRONMENT = "staging" }
 [assets]
 directory = "src/web_ui"
 binding = "ASSETS"
+run_worker_first = true
