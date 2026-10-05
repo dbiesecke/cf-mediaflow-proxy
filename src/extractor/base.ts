@@ -61,7 +61,7 @@ export class BaseExtractor {
   ): ExtractionResult {
     const resolvedFormat = format ?? this.guessFormat(streamUrl);
     return {
-      streamUrl,
+      streamUrl: this.normaliseUrl(streamUrl),
       format: resolvedFormat,
       headers: html ? this.extractVideoHeaders(originalHeaders, html) : undefined,
       ...extra,
@@ -84,13 +84,24 @@ export class BaseExtractor {
   }
 
   /**
-   * Normalise a stream URL: `//host/path` → `https://host/path`.
-   * Some hosts emit protocol-relative URLs.
+   * Normalise a stream URL:
+   *  - Decode common HTML entities (`&amp;` → `&`, `&lt;` → `<`, etc.)
+   *  - `//host/path` → `https://host/path`
+   *
+   * Some hosts embed URLs in HTML with `&amp;` separators; the raw
+   * match must be decoded before it can be used as a real URL.
    */
   static normaliseUrl(raw: string): string {
-    if (raw.startsWith('//')) {
-      return 'https:' + raw;
+    let url = raw;
+    // Decode HTML entities (order matters: &amp; last to avoid double-decode)
+    url = url.replace(/&lt;/g, '<');
+    url = url.replace(/&gt;/g, '>');
+    url = url.replace(/&quot;/g, '"');
+    url = url.replace(/&#39;/g, "'");
+    url = url.replace(/&amp;/g, '&');
+    if (url.startsWith('//')) {
+      return 'https:' + url;
     }
-    return raw;
+    return url;
   }
 }
